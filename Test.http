@@ -1,0 +1,13 @@
+POST http://localhost:8080/api/articles
+Authorization: Bearer {your_access_token}
+Content-Type: application/json
+
+{
+  "title": "我的第一篇文章",
+  "summary": "这是摘要",
+  "content": "# 标题\n\n这是文章内容...",
+  "coverImage": "https://example.com/image.jpg",
+  "categoryId": 1,
+  "tagIds": [1, 2],
+  "isPublished": 1
+}
