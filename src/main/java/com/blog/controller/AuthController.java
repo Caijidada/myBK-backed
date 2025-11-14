@@ -6,6 +6,7 @@ import com.blog.dto.request.RefreshTokenRequest;
 import com.blog.dto.request.RegisterRequest;
 import com.blog.dto.response.LoginResponse;
 import com.blog.service.AuthService;
+import com.blog.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final EmailService emailService;
 
 
     /**
@@ -63,5 +65,14 @@ public class AuthController {
         return Result.success("登出成功", null);
     }
 
+    /**
+     * 发送邮箱验证码
+     */
+    @Operation(summary = "发送邮箱验证码")
+    @PostMapping("/send-captcha")
+    public Result<Void> sendCaptcha(@RequestParam String email) {
+        emailService.sendCaptcha(email);
+        return Result.success("验证码已发送", null);
+    }
 
 }

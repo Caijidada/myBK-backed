@@ -1,6 +1,7 @@
 package com.blog.config;
 
 import com.blog.security.JwtAuthenticationFilter;
+import com.blog.security.OAuth2LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +24,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
 
     /**
      * 密码加密器
@@ -69,6 +71,11 @@ public class SecurityConfig {
                 // 配置会话管理（无状态）
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+
+                // 配置 OAuth2 登录
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oauth2LoginSuccessHandler)
                 )
 
                 // 添加 JWT 过滤器
