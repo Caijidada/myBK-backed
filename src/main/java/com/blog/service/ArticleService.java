@@ -40,12 +40,18 @@ public class ArticleService {
      * 获取文章列表（分页）
      */
     public PageResult<ArticleListResponse> getArticleList(
-            int page, int size, Long categoryId, Long tagId) {
+            int page, int size, Long categoryId, Long tagId, String keyword) {
 
         // 构建查询条件
         LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Article::getIsPublished, Constants.ARTICLE_STATUS_PUBLISHED)
                 .eq(categoryId != null, Article::getCategoryId, categoryId)
+                .and(keyword != null && !keyword.trim().isEmpty(),
+                     w -> w.like(Article::getTitle, keyword)
+                           .or()
+                           .like(Article::getSummary, keyword)
+                           .or()
+                           .like(Article::getContent, keyword))
                 .orderByDesc(Article::getIsTop)
                 .orderByDesc(Article::getPublishedAt);
 
@@ -131,7 +137,13 @@ public class ArticleService {
         article.setContent(request.getContent());
         article.setCoverImage(request.getCoverImage());
         article.setCategoryId(request.getCategoryId());
-        article.setIsPublished(request.getIsPublished());
+
+        // 转换 Boolean 到 Integer (false -> 0, true -> 1)
+        Integer publishStatus = Boolean.TRUE.equals(request.getIsPublished())
+            ? Constants.ARTICLE_STATUS_PUBLISHED
+            : Constants.ARTICLE_STATUS_DRAFT;
+        article.setIsPublished(publishStatus);
+
         article.setIsTop(0);
         article.setIsFeatured(0);
         article.setViewCount(0);
@@ -139,7 +151,7 @@ public class ArticleService {
         article.setCommentCount(0);
         article.setFavoriteCount(0);
 
-        if (request.getIsPublished() == Constants.ARTICLE_STATUS_PUBLISHED) {
+        if (publishStatus == Constants.ARTICLE_STATUS_PUBLISHED) {
             article.setPublishedAt(LocalDateTime.now());
         }
 
@@ -181,9 +193,14 @@ public class ArticleService {
         article.setContent(request.getContent());
         article.setCoverImage(request.getCoverImage());
         article.setCategoryId(request.getCategoryId());
-        article.setIsPublished(request.getIsPublished());
 
-        if (request.getIsPublished() == Constants.ARTICLE_STATUS_PUBLISHED
+        // 转换 Boolean 到 Integer (false -> 0, true -> 1)
+        Integer publishStatus = Boolean.TRUE.equals(request.getIsPublished())
+            ? Constants.ARTICLE_STATUS_PUBLISHED
+            : Constants.ARTICLE_STATUS_DRAFT;
+        article.setIsPublished(publishStatus);
+
+        if (publishStatus == Constants.ARTICLE_STATUS_PUBLISHED
                 && article.getPublishedAt() == null) {
             article.setPublishedAt(LocalDateTime.now());
         }
@@ -339,5 +356,212 @@ public class ArticleService {
         response.setTags(tags);
 
         return response;
+    }
+
+    /**
+     * 点赞文章
+     */
+    @Transactional
+    public void likeArticle(Long articleId, Long userId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null) {
+            throw new ResourceNotFoundException("文章", articleId);
+        }
+
+        // 检查是否已点赞
+        LambdaQueryWrapper<Like> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Like::getUserId, userId)
+                .eq(Like::getTargetType, Constants.LIKE_TARGET_ARTICLE)
+                .eq(Like::getTargetId, articleId);
+
+        if (likeMapper.selectCount(wrapper) > 0) {
+            throw new BusinessException("已经点赞过了");
+        }
+
+        // 添加点赞记录
+        Like like = new Like();
+        like.setUserId(userId);
+        like.setTargetType(Constants.LIKE_TARGET_ARTICLE);
+        like.setTargetId(articleId);
+        likeMapper.insert(like);
+
+        // 增加点赞数
+        article.setLikeCount(article.getLikeCount() + 1);
+        articleMapper.updateById(article);
+    }
+
+    /**
+     * 取消点赞文章
+     */
+    @Transactional
+    public void unlikeArticle(Long articleId, Long userId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null) {
+            throw new ResourceNotFoundException("文章", articleId);
+        }
+
+        // 删除点赞记录
+        LambdaQueryWrapper<Like> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Like::getUserId, userId)
+                .eq(Like::getTargetType, Constants.LIKE_TARGET_ARTICLE)
+                .eq(Like::getTargetId, articleId);
+
+        int deleted = likeMapper.delete(wrapper);
+        if (deleted > 0) {
+            // 减少点赞数
+            article.setLikeCount(Math.max(0, article.getLikeCount() - 1));
+            articleMapper.updateById(article);
+        }
+    }
+
+    /**
+     * 收藏文章
+     */
+    @Transactional
+    public void favoriteArticle(Long articleId, Long userId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null) {
+            throw new ResourceNotFoundException("文章", articleId);
+        }
+
+        // 检查是否已收藏
+        LambdaQueryWrapper<Favorite> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Favorite::getUserId, userId)
+                .eq(Favorite::getArticleId, articleId);
+
+        if (favoriteMapper.selectCount(wrapper) > 0) {
+            throw new BusinessException("已经收藏过了");
+        }
+
+        // 添加收藏记录
+        Favorite favorite = new Favorite();
+        favorite.setUserId(userId);
+        favorite.setArticleId(articleId);
+        favoriteMapper.insert(favorite);
+
+        // 增加收藏数
+        article.setFavoriteCount(article.getFavoriteCount() + 1);
+        articleMapper.updateById(article);
+    }
+
+    /**
+     * 取消收藏文章
+     */
+    @Transactional
+    public void unfavoriteArticle(Long articleId, Long userId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null) {
+            throw new ResourceNotFoundException("文章", articleId);
+        }
+
+        // 删除收藏记录
+        LambdaQueryWrapper<Favorite> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Favorite::getUserId, userId)
+                .eq(Favorite::getArticleId, articleId);
+
+        int deleted = favoriteMapper.delete(wrapper);
+        if (deleted > 0) {
+            // 减少收藏数
+            article.setFavoriteCount(Math.max(0, article.getFavoriteCount() - 1));
+            articleMapper.updateById(article);
+        }
+    }
+
+    /**
+     * 发布文章
+     */
+    @Transactional
+    public void publishArticle(Long articleId, Long userId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null) {
+            throw new ResourceNotFoundException("文章", articleId);
+        }
+
+        if (!article.getUserId().equals(userId)) {
+            throw new BusinessException(403, "无权限发布此文章");
+        }
+
+        if (article.getIsPublished() == Constants.ARTICLE_STATUS_PUBLISHED) {
+            throw new BusinessException("文章已发布");
+        }
+
+        article.setIsPublished(Constants.ARTICLE_STATUS_PUBLISHED);
+        article.setPublishedAt(LocalDateTime.now());
+        articleMapper.updateById(article);
+    }
+
+    /**
+     * 下架文章
+     */
+    @Transactional
+    public void unpublishArticle(Long articleId, Long userId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null) {
+            throw new ResourceNotFoundException("文章", articleId);
+        }
+
+        if (!article.getUserId().equals(userId)) {
+            throw new BusinessException(403, "无权限下架此文章");
+        }
+
+        article.setIsPublished(Constants.ARTICLE_STATUS_DRAFT);
+        articleMapper.updateById(article);
+    }
+
+    /**
+     * 获取用户的文章列表
+     */
+    public PageResult<ArticleListResponse> getUserArticles(Long userId, int page, int size, String status) {
+        LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Article::getUserId, userId);
+
+        if ("published".equals(status)) {
+            wrapper.eq(Article::getIsPublished, Constants.ARTICLE_STATUS_PUBLISHED);
+        } else if ("draft".equals(status)) {
+            wrapper.eq(Article::getIsPublished, Constants.ARTICLE_STATUS_DRAFT);
+        }
+
+        wrapper.orderByDesc(Article::getCreatedAt);
+
+        Page<Article> articlePage = articleMapper.selectPage(new Page<>(page, size), wrapper);
+
+        List<ArticleListResponse> records = articlePage.getRecords().stream()
+                .map(this::convertToListResponse)
+                .collect(Collectors.toList());
+
+        return new PageResult<>(
+                records,
+                articlePage.getTotal(),
+                articlePage.getCurrent(),
+                articlePage.getSize()
+        );
+    }
+
+    /**
+     * 获取用户的收藏列表
+     */
+    public PageResult<ArticleListResponse> getUserFavorites(Long userId, int page, int size) {
+        // 查询用户收藏的文章ID列表
+        Page<Favorite> favoritePage = favoriteMapper.selectPage(
+                new Page<>(page, size),
+                new LambdaQueryWrapper<Favorite>()
+                        .eq(Favorite::getUserId, userId)
+                        .orderByDesc(Favorite::getCreatedAt)
+        );
+
+        List<ArticleListResponse> records = favoritePage.getRecords().stream()
+                .map(favorite -> {
+                    Article article = articleMapper.selectById(favorite.getArticleId());
+                    return article != null ? convertToListResponse(article) : null;
+                })
+                .filter(response -> response != null)
+                .collect(Collectors.toList());
+
+        return new PageResult<>(
+                records,
+                favoritePage.getTotal(),
+                favoritePage.getCurrent(),
+                favoritePage.getSize()
+        );
     }
 }

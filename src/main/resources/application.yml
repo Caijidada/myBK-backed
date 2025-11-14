@@ -5,6 +5,15 @@ spring:
   profiles:
     active: dev
 
+  # Jackson 配置
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    # 禁用Unicode转义，使JSON中文可读
+    generator:
+      escape-non-ascii: false
+
 server:
   port: 8080
 

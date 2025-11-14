@@ -42,10 +42,6 @@ public class AuthService {
         if (user == null) {
             throw new BusinessException("用户名或密码错误");
         }
-        log.info("查询到的用户: {}", user);
-        log.info("输入的密码: {}", request.getPassword());
-        log.info("数据库密码: {}", user.getPassword());
-        log.info("密码匹配结果: {}", passwordEncoder.matches(request.getPassword(), user.getPassword()));
 
         // 验证密码
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {

@@ -36,13 +36,14 @@ public class ArticleController {
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "分类ID") @RequestParam(required = false) Long categoryId,
-            @Parameter(description = "标签ID") @RequestParam(required = false) Long tagId
+            @Parameter(description = "标签ID") @RequestParam(required = false) Long tagId,
+            @Parameter(description = "搜索关键词") @RequestParam(required = false) String keyword
     ) {
         // 参数校验
         if (page < 1) page = Constants.DEFAULT_PAGE_NUM;
         if (size < 1 || size > Constants.MAX_PAGE_SIZE) size = Constants.DEFAULT_PAGE_SIZE;
 
-        PageResult<ArticleListResponse> result = articleService.getArticleList(page, size, categoryId, tagId);
+        PageResult<ArticleListResponse> result = articleService.getArticleList(page, size, categoryId, tagId, keyword);
         return Result.success(result);
     }
 
@@ -98,5 +99,83 @@ public class ArticleController {
     ) {
         articleService.deleteArticle(id, currentUser.getUserId());
         return Result.success("文章删除成功", null);
+    }
+
+    /**
+     * 发布文章
+     */
+    @Operation(summary = "发布文章")
+    @PutMapping("/{id}/publish")
+    public Result<Void> publishArticle(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        articleService.publishArticle(id, currentUser.getUserId());
+        return Result.success("文章发布成功", null);
+    }
+
+    /**
+     * 下架文章
+     */
+    @Operation(summary = "下架文章")
+    @PutMapping("/{id}/unpublish")
+    public Result<Void> unpublishArticle(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        articleService.unpublishArticle(id, currentUser.getUserId());
+        return Result.success("文章下架成功", null);
+    }
+
+    /**
+     * 点赞文章
+     */
+    @Operation(summary = "点赞文章")
+    @PostMapping("/{id}/like")
+    public Result<Void> likeArticle(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        articleService.likeArticle(id, currentUser.getUserId());
+        return Result.success("点赞成功", null);
+    }
+
+    /**
+     * 取消点赞文章
+     */
+    @Operation(summary = "取消点赞文章")
+    @DeleteMapping("/{id}/like")
+    public Result<Void> unlikeArticle(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        articleService.unlikeArticle(id, currentUser.getUserId());
+        return Result.success("取消点赞成功", null);
+    }
+
+    /**
+     * 收藏文章
+     */
+    @Operation(summary = "收藏文章")
+    @PostMapping("/{id}/favorite")
+    public Result<Void> favoriteArticle(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        articleService.favoriteArticle(id, currentUser.getUserId());
+        return Result.success("收藏成功", null);
+    }
+
+    /**
+     * 取消收藏文章
+     */
+    @Operation(summary = "取消收藏文章")
+    @DeleteMapping("/{id}/favorite")
+    public Result<Void> unfavoriteArticle(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        articleService.unfavoriteArticle(id, currentUser.getUserId());
+        return Result.success("取消收藏成功", null);
     }
 }

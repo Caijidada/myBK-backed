@@ -25,7 +25,7 @@ public class ArticleRequest {
     private List<Long> tagIds;
 
     /**
-     * 是否发布：0-草稿，1-发布
+     * 是否发布：false-草稿，true-发布
      */
-    private Integer isPublished;
+    private Boolean isPublished;
 }

@@ -52,6 +52,7 @@ public class SecurityConfig {
                                 "/api/categories/{id}",   // 分类详情
                                 "/api/tags",              // 标签列表
                                 "/api/comments",          // 评论列表（公开）
+                                "/uploads/**",            // 上传文件访问
                                 "/swagger-ui/**",         // Swagger UI
                                 "/swagger-ui.html",       // Swagger UI
                                 "/v3/api-docs/**",        // OpenAPI 文档
