@@ -129,6 +129,12 @@ public class ArticleService {
      */
     @Transactional
     public Long createArticle(ArticleRequest request, Long userId) {
+        // 获取用户信息以检查角色
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new ResourceNotFoundException("用户", userId);
+        }
+
         // 创建文章
         Article article = new Article();
         article.setUserId(userId);
@@ -143,6 +149,15 @@ public class ArticleService {
             ? Constants.ARTICLE_STATUS_PUBLISHED
             : Constants.ARTICLE_STATUS_DRAFT;
         article.setIsPublished(publishStatus);
+
+        // 设置审核状态：管理员文章自动通过，普通用户文章需要审核
+        if ("ADMIN".equals(user.getRole())) {
+            article.setReviewStatus("APPROVED");
+            log.info("管理员文章自动通过审核");
+        } else {
+            article.setReviewStatus("PENDING");
+            log.info("普通用户文章进入待审核状态");
+        }
 
         article.setIsTop(0);
         article.setIsFeatured(0);
@@ -167,7 +182,7 @@ public class ArticleService {
             }
         }
 
-        log.info("用户 {} 创建文章: {}", userId, article.getTitle());
+        log.info("用户 {} 创建文章: {}, 审核状态: {}", userId, article.getTitle(), article.getReviewStatus());
         return article.getId();
     }
 
@@ -563,5 +578,73 @@ public class ArticleService {
                 favoritePage.getCurrent(),
                 favoritePage.getSize()
         );
+    }
+
+    /**
+     * 获取待审核文章列表（仅管理员）
+     */
+    public PageResult<ArticleListResponse> getPendingArticles(int page, int size) {
+        LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Article::getReviewStatus, "PENDING")
+                .orderByDesc(Article::getCreatedAt);
+
+        Page<Article> articlePage = articleMapper.selectPage(new Page<>(page, size), wrapper);
+
+        List<ArticleListResponse> records = articlePage.getRecords().stream()
+                .map(this::convertToListResponse)
+                .collect(Collectors.toList());
+
+        return new PageResult<>(
+                records,
+                articlePage.getTotal(),
+                articlePage.getCurrent(),
+                articlePage.getSize()
+        );
+    }
+
+    /**
+     * 批准文章
+     */
+    @Transactional
+    public void approveArticle(Long articleId, Long reviewerId, String note) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null) {
+            throw new ResourceNotFoundException("文章", articleId);
+        }
+
+        if (!"PENDING".equals(article.getReviewStatus())) {
+            throw new BusinessException("文章不在待审核状态");
+        }
+
+        article.setReviewStatus("APPROVED");
+        article.setReviewerId(reviewerId);
+        article.setReviewedAt(LocalDateTime.now());
+        article.setReviewNote(note);
+        articleMapper.updateById(article);
+
+        log.info("管理员 {} 批准了文章: {}", reviewerId, article.getTitle());
+    }
+
+    /**
+     * 拒绝文章
+     */
+    @Transactional
+    public void rejectArticle(Long articleId, Long reviewerId, String note) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null) {
+            throw new ResourceNotFoundException("文章", articleId);
+        }
+
+        if (!"PENDING".equals(article.getReviewStatus())) {
+            throw new BusinessException("文章不在待审核状态");
+        }
+
+        article.setReviewStatus("REJECTED");
+        article.setReviewerId(reviewerId);
+        article.setReviewedAt(LocalDateTime.now());
+        article.setReviewNote(note);
+        articleMapper.updateById(article);
+
+        log.info("管理员 {} 拒绝了文章: {}, 原因: {}", reviewerId, article.getTitle(), note);
     }
 }

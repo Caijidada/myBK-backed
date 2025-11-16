@@ -49,4 +49,13 @@ public class Article {
     private LocalDateTime updatedAt;
 
     private LocalDateTime publishedAt;
+
+    // 审核相关字段
+    private String reviewStatus; // PENDING, APPROVED, REJECTED
+
+    private Long reviewerId;
+
+    private LocalDateTime reviewedAt;
+
+    private String reviewNote;
 }
